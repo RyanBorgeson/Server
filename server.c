@@ -126,7 +126,8 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 					//printf("Missing packet: %d\n", missedPacket);
 					//currentPacketID = missedPacket;
 				}
-				for (int c = 0; c < WINDOW_SIZE; c++) {
+				int c = 0;
+				for (c = 0; c < WINDOW_SIZE; c++) {
 					window[c] = (const struct Packet) { 0 };
 				}
 				windowIndex = 0;
@@ -161,12 +162,13 @@ int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected,
 	int count = 0;
 
 	// Set each packet to have ID 0
-	for (int p = 0; p < expected; p++) {
+	int p = 0;
+	for (p = 0; p < expected; p++) {
 		receivedPackets[p] = (const struct Packet) { 0 };
 	}
 
-	// Send each packet and check for an ack at the end.
-	for (int p = 0; p < WINDOW_SIZE; p++) {
+	// Send each packet and check for an ack at the en.
+	for (p = 0; p < WINDOW_SIZE; p++) {
 		printf("Attempting to send: %d\n", window[p].id);
 		char hex[sizeof(struct Packet)];
 		memcpy(hex, &window[p], sizeof(struct Packet));
@@ -181,7 +183,8 @@ int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected,
 
 		if (n == -1) {
 			// Send each packet and check for an ack at the end.
-			for (int p = 0; p < WINDOW_SIZE; p++) {
+			int p;
+			for (p = 0; p < WINDOW_SIZE; p++) {
 				printf("Attempting to send: %d\n", window[p].id);
 				char hex[sizeof(struct Packet)];
 				memcpy(hex, &window[p], sizeof(struct Packet));

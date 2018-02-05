@@ -14,7 +14,7 @@ void sendAck(int sockfd, struct sockaddr_in addr, int id);
 
 int main(int argc, char **argv) {
 	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  	char ip[50] = "127.0.0.1";
+  	char ip[50] = "10.0.0.2";
   	int port = 12000;
   	char filename[100] = "home.png",
   		 newFileName[100] = "home2.png";
@@ -102,8 +102,9 @@ int main(int argc, char **argv) {
 			}
 
 			if (packetCount >= pk.totalPackets) {
+			int x = 0;
 
-				for (int x = 0; x < pk.totalPackets; x++)
+				for (x = 0; x < pk.totalPackets; x++)
 				{
 
 					printf("ID: %d  - Type: %d\n", packetsList[x].id, packetsList[x].type);
@@ -126,7 +127,8 @@ int main(int argc, char **argv) {
 
 int packetExists(struct Packet * list, struct Packet packet, int count)
 {
-	for (int i = 0; i < count; i++)
+	int i;
+	for (i = 0; i < count; i++)
 	{
 		if (list[i].id == packet.id)
 			return 1;
