@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
 	serveraddr.sin_addr.s_addr = inet_addr(ip);
 
 	struct timeval timeout;
-	timeout.tv_sec = 5;
+	timeout.tv_sec = 2;
 	timeout.tv_usec = 0;
 
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
@@ -72,7 +72,12 @@ int main(int argc, char **argv) {
 	
 		// Once a response is received, print out the response and close the socket.
 		if (n == -1) {
-			printf("Timed out while receiving.");
+			printf("Timed out while receiving.\n");
+
+			// Check to see if the request actually sent.
+			if (packetCount == 0) {
+				sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+			}
 		} else {
 			struct Packet pk;
 			memcpy(&pk, line, sizeof pk);
@@ -82,13 +87,14 @@ int main(int argc, char **argv) {
 			{
 				packetsList = malloc(pk.totalPackets * sizeof(struct Packet));
 			}
+			if (packetsList != NULL) {
 
-			if (pk.type == FILE_RESPONSE) {
-				struct Packet newPacket;
-				newPacket.id = packetCount;
-				newPacket.type = pk.type;
-				newPacket.totalPackets = pk.totalPackets;
-				strcpy(newPacket.data, pk.data);
+				if (pk.type == FILE_RESPONSE) {
+					struct Packet newPacket;
+					newPacket.id = packetCount;
+					newPacket.type = pk.type;
+					newPacket.totalPackets = pk.totalPackets;
+					strcpy(newPacket.data, pk.data);
 
 					if (!packetExists(packetsList, pk, packetCount)) {
 						if (isValidPacket(pk)) {
@@ -100,16 +106,16 @@ int main(int argc, char **argv) {
 					} else {
 						sendAck(sockfd, serveraddr, pk.id);
 					}
-					
+						
+				}
+
+				if (packetCount >= pk.totalPackets && pk.type == FILE_RESPONSE) {
+					saveFile(packetsList, newFileName);
+
+					break;
+					close(sockfd);
+				}
 			}
-
-			if (packetCount >= pk.totalPackets) {
-				saveFile(packetsList, newFileName);
-
-				break;
-				close(sockfd);
-			}
-
 
 		}
 
