@@ -14,8 +14,8 @@ int main(int argc, char **argv) {
 	int port = 12000;
 
  	// Get the port to listen on.
-  	printf("Listen on port: ");
-  	scanf("%d", &port);
+  	//printf("Listen on port: ");
+  	//scanf("%d", &port);
 
   	// Input validation
   	if (port < 10000 || port > 40000) {
@@ -51,7 +51,7 @@ int main(int argc, char **argv) {
 			memcpy(&pk, line, sizeof pk);
 
 			// Determine the type of the packet.
-			switch(pk.type) {
+			switch((int)pk.type) {
 				case ACK:
 				break;
 				case FILE_REQUEST:
@@ -99,68 +99,41 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 
 		totalPackets = (size / WINDOW_DATA_SIZE) + 1;
 
+		// Break file into packets.
+		int windowIndex = 0;
+
 		while (currentPacketID < totalPackets) {
-			// Break file into packets.
-			int windowIndex = currentPacketID % WINDOW_SIZE;
 
 			// Check for an acknowledgement from the client.
-			if (currentPacketID % WINDOW_SIZE == WINDOW_SIZE - 1 || currentPacketID == totalPackets - 1) {
+			if (windowIndex == WINDOW_SIZE - 1 || currentPacketID == totalPackets - 1) {
 
+				printf("Send Packet: %d\n", currentPacketID);
 				window[windowIndex] = (const struct Packet) { 0 };
 				window[windowIndex].id = currentPacketID;
 				window[windowIndex].totalPackets = totalPackets;
 				window[windowIndex].totalBytes = size;
 				window[windowIndex].type = FILE_RESPONSE;
-				printf("Packet: %d - ack\n", currentPacketID);
 
 				fseek(f, currentPacketID * WINDOW_DATA_SIZE, SEEK_SET);
 				fread(window[windowIndex].data, 1, WINDOW_DATA_SIZE, f);
 
 				rewind(f);
 
-				// Send each packet and check for an ack at the end.
-				for (int p = 0; p < WINDOW_SIZE; p++) {
-					char hex[sizeof(struct Packet)];
-					memcpy(hex, &window[p], sizeof(struct Packet));
-					sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
+				
+
+				if (!on_receiveAcknowledgement(sockfd, addr, windowIndex + 1, &window))
+				{
+					//printf("Missing packet: %d\n", missedPacket);
+					//currentPacketID = missedPacket;
 				}
-
-				// Wait for a response from the user.
-				while(1) {
-					int len = sizeof(addr);
-					char line[sizeof(struct Packet)];
-					int n = recvfrom(sockfd, line, sizeof(struct Packet), 0, (struct sockaddr*)&addr, &len);
-
-					// Either timeout or print out the client's message.
-					if (n == -1) {
-						printf("Timed out while waiting to receive\n");
-						break;
-					} else {
-						// Copy retrieved packet into packet structure.
-						struct Packet pk;
-						memcpy(&pk, line, sizeof(struct Packet));
-
-						printf("packet received %d %d\n", pk.type, strlen(pk.data));
-						// Check for any errors or missed frames.
-						if (strlen(pk.data) > 0) {
-							// There was an error so clear the window
-							// an place back at the start of the missed frame.
-							for (int x = 0; x < WINDOW_SIZE; x++)
-								window[x] = (const struct Packet) { 0 };
-
-							windowIndex = 0;
-							currentPacketID = atoi(pk.data);
-						} else {
-							break;	
-						}
-					}
-
+				for (int c = 0; c < WINDOW_SIZE; c++) {
+					window[c] = (const struct Packet) { 0 };
 				}
+				windowIndex = 0;
 
 			} else {
 
-				//if (currentPacketID != 1) {
-				printf("Packet: %d\n", currentPacketID);
+				printf("Send Packet: %d\n", currentPacketID);
 				window[windowIndex] = (const struct Packet) { 0 };
 				window[windowIndex].id = currentPacketID;
 				window[windowIndex].totalPackets = totalPackets;
@@ -168,7 +141,7 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 				window[windowIndex].type = FILE_RESPONSE;
 				fseek(f, currentPacketID * WINDOW_DATA_SIZE, SEEK_SET);
 				fread(window[windowIndex].data, 1, WINDOW_DATA_SIZE, f);
-				//}
+				windowIndex++;
 
 				rewind(f);
 			}
@@ -180,4 +153,50 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 
 void on_responseFile() {
 
+}
+
+int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected, struct Packet * window) {
+	struct Packet receivedPackets[expected];
+
+	int count = 0;
+
+	// Set each packet to have ID 0
+	for (int p = 0; p < expected; p++) {
+		receivedPackets[p] = (const struct Packet) { 0 };
+	}
+
+	// Send each packet and check for an ack at the end.
+	for (int p = 0; p < WINDOW_SIZE; p++) {
+		printf("Attempting to send: %d\n", window[p].id);
+		char hex[sizeof(struct Packet)];
+		memcpy(hex, &window[p], sizeof(struct Packet));
+		sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
+	}
+
+	// Wait for a response from the user.
+	while(count < expected) {
+		int len = sizeof(addr);
+		char line[sizeof(struct Packet)];
+		int n = recvfrom(sockfd, line, sizeof(struct Packet), 0, (struct sockaddr*)&addr, &len);
+
+		if (n == -1) {
+			// Send each packet and check for an ack at the end.
+			for (int p = 0; p < WINDOW_SIZE; p++) {
+				printf("Attempting to send: %d\n", window[p].id);
+				char hex[sizeof(struct Packet)];
+				memcpy(hex, &window[p], sizeof(struct Packet));
+				sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
+			}
+
+		} else {
+			// Copy retrieved packet into packet structure.
+			struct Packet pk;
+			memcpy(&pk, line, sizeof(struct Packet));
+
+			receivedPackets[count] = pk;
+			printf("Packet ACK received %d\n", pk.id);
+			count++;
+		}
+	}
+	return -1;
 }

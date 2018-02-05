@@ -1,5 +1,10 @@
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
-#define ACK				0
+#define ACK				4
 #define FILE_REQUEST 	1
 #define FILE_RESPONSE 	2
 #define ERROR			3
@@ -13,3 +18,5 @@ struct Packet {
 	char data[1024];
 	char checksum[10];
 };
+
+int comparePackets(const void * p1, const void * p2);
