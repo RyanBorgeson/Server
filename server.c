@@ -3,19 +3,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
-#include "com.h"
+#include "packet.h"
 
 
 void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr);
-void on_responseFile();
 
 int main(int argc, char **argv) {
 	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	int port = 12000;
 
  	// Get the port to listen on.
-  	//printf("Listen on port: ");
-  	//scanf("%d", &port);
+  	printf("Listen on port: ");
+  	scanf("%d", &port);
 
   	// Input validation
   	if (port < 10000 || port > 40000) {
@@ -56,9 +55,6 @@ int main(int argc, char **argv) {
 				break;
 				case FILE_REQUEST:
 					on_requestFile(pk, sockfd, clientaddr);
-					break;
-				case FILE_RESPONSE:
-					on_responseFile();
 					break;
 			}
 
@@ -107,7 +103,6 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 			// Check for an acknowledgement from the client.
 			if (windowIndex == WINDOW_SIZE - 1 || currentPacketID == totalPackets - 1) {
 
-				printf("Send Packet: %d\n", currentPacketID);
 				window[windowIndex] = (const struct Packet) { 0 };
 				window[windowIndex].id = currentPacketID;
 				window[windowIndex].totalPackets = totalPackets;
@@ -116,6 +111,7 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 
 				fseek(f, currentPacketID * WINDOW_DATA_SIZE, SEEK_SET);
 				fread(window[windowIndex].data, 1, WINDOW_DATA_SIZE, f);
+				window[windowIndex].checksum = (unsigned char)checksum(window[windowIndex]);
 
 				rewind(f);
 
@@ -123,8 +119,6 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 
 				if (!on_receiveAcknowledgement(sockfd, addr, windowIndex + 1, &window))
 				{
-					//printf("Missing packet: %d\n", missedPacket);
-					//currentPacketID = missedPacket;
 				}
 				int c = 0;
 				for (c = 0; c < WINDOW_SIZE; c++) {
@@ -140,8 +134,11 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 				window[windowIndex].totalPackets = totalPackets;
 				window[windowIndex].totalBytes = size;
 				window[windowIndex].type = FILE_RESPONSE;
+
 				fseek(f, currentPacketID * WINDOW_DATA_SIZE, SEEK_SET);
 				fread(window[windowIndex].data, 1, WINDOW_DATA_SIZE, f);
+				window[windowIndex].checksum = (unsigned char)checksum(window[windowIndex]);
+
 				windowIndex++;
 
 				rewind(f);
@@ -150,10 +147,6 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 		}
 		fclose(f);
 	}
-}
-
-void on_responseFile() {
-
 }
 
 int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected, struct Packet * window) {
@@ -169,7 +162,7 @@ int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected,
 
 	// Send each packet and check for an ack at the en.
 	for (p = 0; p < WINDOW_SIZE; p++) {
-		printf("Attempting to send: %d\n", window[p].id);
+		printf("Attempting to send: %d Checksum: %#x\n", window[p].id, window[p].checksum);
 		char hex[sizeof(struct Packet)];
 		memcpy(hex, &window[p], sizeof(struct Packet));
 		sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
@@ -185,7 +178,7 @@ int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected,
 			// Send each packet and check for an ack at the end.
 			int p;
 			for (p = 0; p < WINDOW_SIZE; p++) {
-				printf("Attempting to send: %d\n", window[p].id);
+				printf("Attempting to send: %d Checksum: %#x\n", window[p].id, window[p].checksum);
 				char hex[sizeof(struct Packet)];
 				memcpy(hex, &window[p], sizeof(struct Packet));
 				sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
@@ -196,9 +189,11 @@ int on_receiveAcknowledgement(int sockfd, struct sockaddr_in addr, int expected,
 			struct Packet pk;
 			memcpy(&pk, line, sizeof(struct Packet));
 
-			receivedPackets[count] = pk;
-			printf("Packet ACK received %d\n", pk.id);
-			count++;
+			if (!packetExists(&receivedPackets, pk, expected)) {
+				receivedPackets[count] = pk;
+				printf("Packet ACK received %d\n", pk.id);
+				count++;
+			}
 		}
 	}
 	return -1;
