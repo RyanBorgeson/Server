@@ -8,7 +8,6 @@
 
 int processReceivedPackets(struct Packet * recv, int currentPacket, char * newFileName);
 
-void on_missedPacket(int missedId, int sockfd, struct sockaddr_in addr);
 void sendAck(int sockfd, struct sockaddr_in addr, int id);
 
 void saveFile(struct Packet * packets, char * newFileName);
@@ -126,21 +125,6 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
-
-
-
-
-void on_missedPacket(int missedId, int sockfd, struct sockaddr_in addr) {
-	// Create packet
-	struct Packet pk = (const struct Packet) { 0 };
-	pk.type = ACK;
-	sprintf(pk.data, "%d", missedId);
-	
-	char hex[sizeof(struct Packet)];
-	memcpy(hex, &pk, sizeof pk);
-	sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
-}
-
 void sendAck(int sockfd, struct sockaddr_in addr, int id) {
 	// Create packet
 	struct Packet pk = (const struct Packet) { 0 };
@@ -162,9 +146,9 @@ void saveFile(struct Packet * packets, char * newFileName) {
 	for (i = 0; i < totalPackets; i++) {
 		// Last packet
 		if (packets[i].id == totalPackets - 1) {
-			fwrite(packets[i].data, WINDOW_DATA_SIZE - ((totalPackets * WINDOW_DATA_SIZE) - packets[i].totalBytes), 1, f);
+			fwrite(packets[i].data, PACKET_DATA_SIZE - ((totalPackets * PACKET_DATA_SIZE) - packets[i].totalBytes), 1, f);
 		} else {
-			fwrite(packets[i].data, WINDOW_DATA_SIZE, 1, f);
+			fwrite(packets[i].data, PACKET_DATA_SIZE, 1, f);
 		}
 	}
 

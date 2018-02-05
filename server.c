@@ -93,7 +93,7 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 		size = ftell(f);
 		rewind(f);
 
-		totalPackets = (size / WINDOW_DATA_SIZE) + 1;
+		totalPackets = (size / PACKET_DATA_SIZE) + 1;
 
 		// Break file into packets.
 		int windowIndex = 0;
@@ -109,8 +109,8 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 				window[windowIndex].totalBytes = size;
 				window[windowIndex].type = FILE_RESPONSE;
 
-				fseek(f, currentPacketID * WINDOW_DATA_SIZE, SEEK_SET);
-				fread(window[windowIndex].data, 1, WINDOW_DATA_SIZE, f);
+				fseek(f, currentPacketID * PACKET_DATA_SIZE, SEEK_SET);
+				fread(window[windowIndex].data, 1, PACKET_DATA_SIZE, f);
 				window[windowIndex].checksum = (unsigned char)checksum(window[windowIndex]);
 
 				rewind(f);
@@ -135,8 +135,8 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 				window[windowIndex].totalBytes = size;
 				window[windowIndex].type = FILE_RESPONSE;
 
-				fseek(f, currentPacketID * WINDOW_DATA_SIZE, SEEK_SET);
-				fread(window[windowIndex].data, 1, WINDOW_DATA_SIZE, f);
+				fseek(f, currentPacketID * PACKET_DATA_SIZE, SEEK_SET);
+				fread(window[windowIndex].data, 1, PACKET_DATA_SIZE, f);
 				window[windowIndex].checksum = (unsigned char)checksum(window[windowIndex]);
 
 				windowIndex++;
