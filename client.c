@@ -97,6 +97,7 @@ int main(int argc, char **argv) {
 					packetCount++;
 					printf("Adding Packet: %d\n", pk.id);
 				} else {
+					sendAck(sockfd, serveraddr, pk.id);
 					printf("Not adding: %d\n", pk.id);
 				}
 			}
