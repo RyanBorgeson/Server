@@ -7,6 +7,7 @@
  */
 
 #include <netinet/in.h>
+#include <string.h>
 
 #define NONE					0
 #define FILE_REQUEST 			1
@@ -64,4 +65,23 @@ int isValidPacket(struct Packet p);
  */
 int packetExists(struct Packet * list, struct Packet packet, int count);
 
-Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int totalBytes, char * data, unsigned char checksum);
+/**
+ * Create Packet - Constructs a packet and calculates
+ * the checksum value.
+ * @param id The ID of the packet.
+ * @param type The type of packet.
+ * @param totalPackets The total number of related packets.
+ * @param totalBytes The total number of bytes for all packets.
+ * @param data The data to transmit in the packet.
+ * @return Returns a packet structure.
+ */
+Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int totalBytes, char * data);
+
+/**
+ * Send Packet - Sends the provided packet to the server's
+ * address.
+ * @param packet The packet to send.
+ * @param sockfd Socket file descriptor?
+ * @param addr Server information.
+ */
+void sendPacket(Packet packet, int sockfd, struct sockaddr_in addr);

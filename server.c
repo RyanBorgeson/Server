@@ -80,7 +80,7 @@ void on_requestFile(struct Packet packet, int sockfd, struct sockaddr_in addr) {
 		char hex[sizeof(struct Packet)];
 		struct Packet errorPacket = (const struct Packet) { 0 };
 		errorPacket.type = ERROR;
-		strcpy(errorPacket.data, "Files does not exist.");
+		strcpy(errorPacket.data, "File does not exist.");
 		memcpy(hex, &errorPacket, sizeof(struct Packet));
 		sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
 	} else {

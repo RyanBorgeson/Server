@@ -46,13 +46,18 @@ int packetExists(Packet * list, Packet packet, int count)
 }
 
 
-Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int totalBytes, char * data, unsigned char checksum) {
-	struct Packet packet;
+Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int totalBytes, char * data) {
+	struct Packet packet = (const struct Packet) { 0 };
 	packet.id = id;
 	packet.type = type;
 	packet.totalPackets = totalPackets;
 	packet.totalBytes = totalBytes;
 	strcpy(packet.data, data);
-	packet.checksum = checksum;
+	packet.checksum = (unsigned char)checksum(packet);
 	return packet;
+}
+
+void sendPacket(Packet packet, int sockfd, struct sockaddr_in addr) {
+	unsigned char *payload = (unsigned char*)&packet;
+	sendto(sockfd, payload, sizeof(Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
 }

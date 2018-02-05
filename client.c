@@ -1,23 +1,39 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include "packet.h"
-
-
-int processReceivedPackets(struct Packet * recv, int currentPacket, char * newFileName);
-
-void sendAck(int sockfd, struct sockaddr_in addr, int id);
-
-void saveFile(struct Packet * packets, char * newFileName);
+/**
+ * Client - Client side that allows the user to connect
+ * to the server and retrieve a file ensuring the each packet
+ * is received and not corrupt.
+ * @author Ryan Borgeson
+ * @date 2/5/2018
+ */
+#include "client.h"
 
 int main(int argc, char **argv) {
-	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-  	char ip[50];
-  	int port = 12000;
-  	char filename[100],
+
+	/* Socket file descriptor. */
+	int sockfd = socket(AF_INET, SOCK_DGRAM, 0),
+	/* Packet counter. */
+		packetCount = 0;
+
+	/* Server information. */
+	struct sockaddr_in serveraddr;
+
+	/* Socket timeout options. */
+	struct timeval timeout;
+	timeout.tv_sec = 2;
+	timeout.tv_usec = 0;
+
+	/* List of received packet structures. */
+	struct Packet * packetsList;
+
+	/* Server's IP. */
+  	char ip[50],
+  	/* Requested file name. */
+  		 filename[100],
+  	/* New file name. */
   		 newFileName[100];
+
+  	/* Server port. */
+  	int port;
 
 
   	// Get port and IP of server.
@@ -37,105 +53,78 @@ int main(int argc, char **argv) {
   		exit(0);
 	}
 
-	struct sockaddr_in serveraddr;
 	serveraddr.sin_family = AF_INET;
 	serveraddr.sin_port = htons(port);
 	serveraddr.sin_addr.s_addr = inet_addr(ip);
 
-	struct timeval timeout;
-	timeout.tv_sec = 2;
-	timeout.tv_usec = 0;
-
+	// Setup socket options with time out.
 	setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
 	// Create packet
-	struct Packet pk = (const struct Packet) { 0 };
-	pk.id = 1;
-	pk.type = FILE_REQUEST;
-	strcpy(pk.data, filename);
+	Packet fileRequestPacket = createPacket(1, FILE_REQUEST, 1, 0, filename);
 	
-	// Copy packet structure into a byte array
-	// for transmission.
-	char hex[sizeof(struct Packet)];
-	memcpy(hex, &pk, sizeof pk);
-	sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
-
-	// Wait for a response from the server.
-	int packetCount = 0;
-	struct Packet * packetsList;
+	// Copy and send packet for file request.
+	sendPacket(fileRequestPacket, sockfd, serveraddr);
 
 	while(1) {
 		int len = sizeof(serveraddr);
-		char line[sizeof(struct Packet)];
-		int n = recvfrom(sockfd, line, sizeof(struct Packet), 0, (struct sockaddr*)&serveraddr, &len);
+		char byteStream[sizeof(Packet)];
+		int n = recvfrom(sockfd, byteStream, sizeof(Packet), 0, (struct sockaddr*)&serveraddr, &len);
 	
-		// Once a response is received, print out the response and close the socket.
+		// Determine if there was a time out.
 		if (n == -1) {
-			printf("Timed out while receiving.\n");
-
-			// Check to see if the request actually sent.
+			// In case the inital packet didn't send, send it again.
 			if (packetCount == 0) {
-				sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&serveraddr, sizeof(serveraddr));
+				sendPacket(fileRequestPacket, sockfd, serveraddr);
 			}
 		} else {
-			struct Packet pk;
-			memcpy(&pk, line, sizeof pk);
+			struct Packet rPacket;
+			memcpy(&rPacket, byteStream, sizeof(Packet));
+			
+			// If an error ocurred, let the user know.
+			if (rPacket.type == ERROR) {
+				printf("%s\n", rPacket.data);
+				break;
+			}
 
 			// Check to see if packets list is empty.
-			if (packetsList == NULL)
-			{
-				packetsList = malloc(pk.totalPackets * sizeof(struct Packet));
+			if (packetsList == NULL) {
+				packetsList = malloc(rPacket.totalPackets * sizeof(Packet));
 			}
+
+			// If the packets list exists.
 			if (packetsList != NULL) {
-
-				if (pk.type == FILE_RESPONSE) {
-					struct Packet newPacket;
-					newPacket.id = packetCount;
-					newPacket.type = pk.type;
-					newPacket.totalPackets = pk.totalPackets;
-					strcpy(newPacket.data, pk.data);
-
-					if (!packetExists(packetsList, pk, packetCount)) {
-						if (isValidPacket(pk)) {
-							packetsList[packetCount] = pk;
-							sendAck(sockfd, serveraddr, pk.id);
+				if (rPacket.type == FILE_RESPONSE) {
+					if (!packetExists(packetsList, rPacket, packetCount)) {
+						if (isValidPacket(rPacket)) {
+							packetsList[packetCount] = rPacket;
+							sendAck(sockfd, serveraddr, rPacket.id);
+							printf("Received Valid Packet: %d\n", rPacket.id);
 							packetCount++;
-							printf("Received Valid Packet: %d\n", pk.id);
 						}
 					} else {
-						sendAck(sockfd, serveraddr, pk.id);
+						sendAck(sockfd, serveraddr, rPacket.id);
 					}
-						
 				}
-
-				if (packetCount >= pk.totalPackets && pk.type == FILE_RESPONSE) {
+				// If all packets have been received, save the file.
+				if (packetCount >= rPacket.totalPackets && rPacket.type == FILE_RESPONSE) {
 					saveFile(packetsList, newFileName);
-
-					break;
 					close(sockfd);
+					break;
 				}
 			}
-
 		}
-
 	}
 
 	free(packetsList);
-
 	return 0;
 }
 
 void sendAck(int sockfd, struct sockaddr_in addr, int id) {
-	// Create packet
-	struct Packet pk = (const struct Packet) { 0 };
-	pk.type = ACK;
-	pk.id = id;
-	
-	char hex[sizeof(struct Packet)];
-	memcpy(hex, &pk, sizeof pk);
-	sendto(sockfd, hex, sizeof(struct Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
+	// Create and send acknowledgement.
+	char data[] = "ack";
+	sendPacket(createPacket(id, ACK, 1, 0, data), sockfd, addr);
 }
-
 
 void saveFile(struct Packet * packets, char * newFileName) {
 	int totalPackets = packets[0].totalPackets, i;
@@ -144,13 +133,12 @@ void saveFile(struct Packet * packets, char * newFileName) {
 	FILE *f = fopen(newFileName, "ab");
 
 	for (i = 0; i < totalPackets; i++) {
-		// Last packet
+		// The last packet may contain less than 1024 bytes worth of data.
 		if (packets[i].id == totalPackets - 1) {
 			fwrite(packets[i].data, PACKET_DATA_SIZE - ((totalPackets * PACKET_DATA_SIZE) - packets[i].totalBytes), 1, f);
 		} else {
 			fwrite(packets[i].data, PACKET_DATA_SIZE, 1, f);
 		}
 	}
-
 	fclose(f);
 }
