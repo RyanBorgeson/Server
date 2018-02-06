@@ -10,28 +10,23 @@
 int main(int argc, char **argv) {
 
 	/* Socket file descriptor. */
-	int sockfd = socket(AF_INET, SOCK_DGRAM, 0),
+	int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	/* Packet counter. */
-		packetCount = 0;
-
+	int packetCount = 0;
 	/* Server information. */
 	struct sockaddr_in serveraddr;
-
 	/* Socket timeout options. */
 	struct timeval timeout;
-	timeout.tv_sec = 2;
-	timeout.tv_usec = 0;
-
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 250;
 	/* List of received packet structures. */
-	struct Packet * packetsList;
-
+	Packet * packetsList;
 	/* Server's IP. */
-  	char ip[50],
+  	char ip[50];
   	/* Requested file name. */
-  		 filename[100],
+  	char filename[100];
   	/* New file name. */
-  		 newFileName[100];
-
+  	char newFileName[100];
   	/* Server port. */
   	int port;
 
@@ -78,9 +73,9 @@ int main(int argc, char **argv) {
 				sendPacket(fileRequestPacket, sockfd, serveraddr);
 			}
 		} else {
-			struct Packet rPacket;
+			Packet rPacket;
 			memcpy(&rPacket, byteStream, sizeof(Packet));
-			
+
 			// If an error ocurred, let the user know.
 			if (rPacket.type == ERROR) {
 				printf("%s\n", rPacket.data);
@@ -126,9 +121,9 @@ void sendAck(int sockfd, struct sockaddr_in addr, int id) {
 	sendPacket(createPacket(id, ACK, 1, 0, data), sockfd, addr);
 }
 
-void saveFile(struct Packet * packets, char * newFileName) {
+void saveFile(Packet * packets, char * newFileName) {
 	int totalPackets = packets[0].totalPackets, i;
-	qsort(packets, totalPackets, sizeof(struct Packet), comparePackets);
+	qsort(packets, totalPackets, sizeof(Packet), comparePackets);
 	
 	FILE *f = fopen(newFileName, "ab");
 

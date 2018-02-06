@@ -3,7 +3,7 @@
  * Methods for handling packets such as creating packets,
  * calculating checksums, and checking for valid packets.
  * @author Ryan Borgeson
- * @date 2/5/18
+ * @date 2/5/2018
  */
 
 #include <netinet/in.h>
@@ -85,3 +85,11 @@ Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int total
  * @param addr Server information.
  */
 void sendPacket(Packet packet, int sockfd, struct sockaddr_in addr);
+
+/**
+ * Clear Window - Clears the window of every packet it the
+ * list according to the WINDOW_SIZE.
+ * @param packets List or window of packets.
+ * @param length Length of list.
+ */
+void clearWindow(Packet * packets, int length);

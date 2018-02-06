@@ -3,7 +3,7 @@
  * Methods for handling packets such as creating packets,
  * calculating checksums, and checking for valid packets.
  * @author Ryan Borgeson
- * @date 2/5/18
+ * @date 2/5/2018
  */
 #include "packet.h"
 
@@ -52,7 +52,7 @@ Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int total
 	packet.type = type;
 	packet.totalPackets = totalPackets;
 	packet.totalBytes = totalBytes;
-	strcpy(packet.data, data);
+	memcpy(packet.data, data, PACKET_DATA_SIZE);
 	packet.checksum = (unsigned char)checksum(packet);
 	return packet;
 }
@@ -60,4 +60,11 @@ Packet createPacket(uint16_t id, uint16_t type, uint16_t totalPackets, int total
 void sendPacket(Packet packet, int sockfd, struct sockaddr_in addr) {
 	unsigned char *payload = (unsigned char*)&packet;
 	sendto(sockfd, payload, sizeof(Packet), 0, (struct sockaddr*)&addr, sizeof(addr));
+}
+
+void clearWindow(Packet * packets, int length) {
+	int c = 0;
+	for (c = 0; c < length; c++) {
+		packets[c] = (const Packet) { 0 };
+	}
 }
