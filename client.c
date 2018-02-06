@@ -122,6 +122,7 @@ void sendAck(int sockfd, struct sockaddr_in addr, int id) {
 }
 
 void saveFile(Packet * packets, char * newFileName) {
+	printf("Saving to file...\n");
 	int totalPackets = packets[0].totalPackets, i;
 	qsort(packets, totalPackets, sizeof(Packet), comparePackets);
 	

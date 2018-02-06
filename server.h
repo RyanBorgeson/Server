@@ -13,7 +13,7 @@
 #include "packet.h"
 
 /* Max number of attempts to send last packet. */
-#define MAX_ATTEMPTS 50
+#define MAX_ATTEMPTS 1000
 
 /**
  * Main - Main execution point for the server.
